@@ -34,8 +34,6 @@ import java.io.PrintWriter;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
 
-import com.google.common.base.Joiner;
-
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.FileUtils;
@@ -667,6 +665,14 @@ public class TestJsonReader extends BaseTestQuery {
       writer.write("{ \"c1\" : \"Hello World\" }\n");
     }
 
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path, "json_null_fields.json")))) {
+      writer.write("{ \"c1\" : null, \"c2\" : null, \"c3\" : null }");
+    }
+
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path, "json_nested_null_fields.json")))) {
+      writer.write("{\"c0\":{\"c11\": \"I am not NULL\", \"c1\": null}, \"c1\": \"I am not NULL\", \"c11\":null}");
+    }
+
     try {
       testNoResult("alter session set `store.json.all_text_mode` = true");
       testBuilder()
@@ -690,8 +696,27 @@ public class TestJsonReader extends BaseTestQuery {
         .baselineValues("Hello World")
         .go();
 
+      testBuilder()
+        .sqlQuery(String.format("select * from dfs_test.`%s/json_nested_null_fields.json`", pathString))
+        .unOrdered()
+        .sqlBaselineQuery(String.format("select c0,c1,c11 from dfs_test.`%s/json_nested_null_fields.json`", pathString))
+        .go();
+
+      testNoResult("alter session set `store.json.all_text_mode` = false");
+
+      testBuilder()
+        .sqlQuery(String.format("select * from dfs_test.`%s/json_null_fields.json`", pathString))
+        .unOrdered()
+        .baselineColumns("c1", "c2", "c3")
+        .baselineValues(null, null, null)
+        .go();
+
     } finally {
       testNoResult("ALTER SESSION reset `store.json.all_text_mode`");
+      java.nio.file.Files.delete(new File(path, "tooManyNulls.json").toPath());
+      java.nio.file.Files.delete(new File(path, "json_null_fields.json").toPath());
+      java.nio.file.Files.delete(new File(path, "json_nested_null_fields.json").toPath());
+      java.nio.file.Files.delete(path.toPath());
     }
   }
 }

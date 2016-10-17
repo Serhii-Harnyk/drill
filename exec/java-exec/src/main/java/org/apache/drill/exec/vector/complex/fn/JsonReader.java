@@ -59,12 +59,13 @@ public class JsonReader extends BaseJsonProcessor {
   private final ListVectorOutput listOutput;
   private final boolean extended = true;
   private final boolean readNumbersAsDouble;
+  private List<String> path = Lists.newArrayList();
 
   /**
    * Collection for tracking nullable fields during reading
    * and storing them for creating default typed vectors
    */
-  private final Set<String> nullableFields  = Sets.newLinkedHashSet();
+  private final Set<List<String>> nullableFields  = Sets.newLinkedHashSet();
 
   /**
    * Describes whether or not this reader can unwrap a single root array record
@@ -153,25 +154,27 @@ public class JsonReader extends BaseJsonProcessor {
     for (int j = 0; j < fieldPathList.size(); j++) {
       BaseWriter.MapWriter fieldWriter = writerList.get(j);
       PathSegment fieldPath = fieldPathList.get(j);
-      if (emptyStatus.get(j)) {
-        if (allTextMode) {
-          if (checkNullFields(fieldPathList)) {
-            for (String fieldName : nullableFields) {
-              fieldWriter.varChar(fieldName);
-            }
-          } else {
-            fieldWriter.varChar(fieldPath.getNameSegment().getPath());
-          }
-        } else {
-          if (checkNullFields(fieldPathList)) {
-            for (String fieldName : nullableFields) {
-              fieldWriter.integer(fieldName);
-            }
-          } else {
-            fieldWriter.integer(fieldPath.getNameSegment().getPath());
-          }
-        }
+      if (emptyStatus.get(j) && !checkNullFields(fieldPathList)) {
+        initializeFieldWriter(fieldWriter, fieldPath.getNameSegment().getPath());
       }
+    }
+
+    if (checkNullFields(fieldPathList)) {
+      for (List<String> fieldPath : nullableFields) {
+        BaseWriter.MapWriter fieldWriter = writer.rootAsMap();
+        for (int i = 0; i < fieldPath.size() - 1; i++) {
+          fieldWriter = fieldWriter.map(fieldPath.get(i));
+        }
+        initializeFieldWriter(fieldWriter, fieldPath.get(fieldPath.size() - 1));
+      }
+    }
+  }
+
+  private void initializeFieldWriter(MapWriter fieldWriter, String path) {
+    if (allTextMode) {
+      fieldWriter.varChar(path);
+    } else {
+      fieldWriter.integer(path);
     }
   }
 
@@ -379,12 +382,19 @@ public class JsonReader extends BaseJsonProcessor {
           t = parser.getCurrentToken();
           moveForward = true;
         }
-        if (t == JsonToken.NOT_AVAILABLE || t == JsonToken.END_OBJECT) {
+
+        if (t == JsonToken.NOT_AVAILABLE) {
           return;
         }
 
-        assert t == JsonToken.FIELD_NAME : String.format(
-            "Expected FIELD_NAME but got %s.", t.name());
+        if (t == JsonToken.END_OBJECT) {
+          if (path.size() > 0) {
+            path.remove(path.size() - 1);
+          }
+          return;
+        }
+
+        assert t == JsonToken.FIELD_NAME : String.format("Expected FIELD_NAME but got %s.", t.name());
 
         final String fieldName = parser.getText();
         this.currentFieldName = fieldName;
@@ -394,13 +404,13 @@ public class JsonReader extends BaseJsonProcessor {
           continue outside;
         }
 
-        nullableFields.remove(fieldName);
         switch (parser.nextToken()) {
         case START_ARRAY:
           writeData(map.list(fieldName));
           break;
         case START_OBJECT:
           if (!writeMapDataIfTyped(map, fieldName)) {
+            path.add(fieldName);
             writeData(map.map(fieldName), childSelection, false);
           }
           break;
@@ -416,8 +426,7 @@ public class JsonReader extends BaseJsonProcessor {
           break;
         }
         case VALUE_NULL:
-          nullableFields.add(fieldName);
-          // do nothing as we don't have a type.
+          putFieldPath(fieldName);
           break;
         case VALUE_NUMBER_FLOAT:
           map.float8(fieldName).writeFloat8(parser.getDoubleValue());
@@ -460,12 +469,19 @@ public class JsonReader extends BaseJsonProcessor {
         t = parser.getCurrentToken();
         moveForward = true;
       }
-       if (t == JsonToken.NOT_AVAILABLE || t == JsonToken.END_OBJECT) {
+
+      if (t == JsonToken.NOT_AVAILABLE) {
         return;
       }
 
-      assert t == JsonToken.FIELD_NAME : String.format(
-          "Expected FIELD_NAME but got %s.", t.name());
+      if (t == JsonToken.END_OBJECT) {
+        if (path.size() > 0) {
+          path.remove(path.size() - 1);
+        }
+        return;
+      }
+
+      assert t == JsonToken.FIELD_NAME : String.format("Expected FIELD_NAME but got %s.", t.name());
 
       final String fieldName = parser.getText();
       this.currentFieldName = fieldName;
@@ -475,13 +491,13 @@ public class JsonReader extends BaseJsonProcessor {
         continue outside;
       }
 
-      nullableFields.remove(fieldName);
       switch (parser.nextToken()) {
       case START_ARRAY:
         writeDataAllText(map.list(fieldName));
         break;
       case START_OBJECT:
         if (!writeMapDataIfTyped(map, fieldName)) {
+          path.add(fieldName);
           writeDataAllText(map.map(fieldName), childSelection, false);
         }
         break;
@@ -497,7 +513,7 @@ public class JsonReader extends BaseJsonProcessor {
         handleString(parser, map, fieldName);
         break;
       case VALUE_NULL:
-        nullableFields.add(fieldName);
+        putFieldPath(fieldName);
         break;
 
       default:
@@ -508,6 +524,16 @@ public class JsonReader extends BaseJsonProcessor {
     }
     map.end();
 
+  }
+
+  /**
+   * Puts copy of field path list to nullableFields set.
+   * @param fieldName
+   */
+  private void putFieldPath(String fieldName) {
+    List<String> fieldPath = Lists.newArrayList(path);
+    fieldPath.add(fieldName);
+    nullableFields.add(fieldPath);
   }
 
   /**
