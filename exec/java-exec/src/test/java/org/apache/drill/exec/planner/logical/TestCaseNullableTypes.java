@@ -17,7 +17,11 @@
 package org.apache.drill.exec.planner.logical;
 
 import org.apache.drill.BaseTestQuery;
+import org.apache.drill.exec.rpc.user.QueryDataBatch;
+import org.junit.Ignore;
 import org.junit.Test;
+
+import java.util.List;
 
 /**
  * DRILL-4906
@@ -123,5 +127,24 @@ public class TestCaseNullableTypes extends BaseTestQuery {
       .baselineColumns("res1", "res2")
       .baselineValues(1, 0.1f)
       .go();
+  }
+
+  @Test //DRILL-4923
+  public void testCaseNullableTimestamp() throws Exception {
+    testBuilder()
+      .sqlQuery("SELECT (CASE WHEN (false) THEN null ELSE CAST('1990-10-10 22:40:50' AS TIMESTAMP) END) res FROM (values(1)) foo")
+      .unOrdered()
+      .sqlBaselineQuery("SELECT CAST('1990-10-10 22:40:50' AS TIMESTAMP) res FROM (values(1)) foo")
+      .go();
+  }
+
+  @Ignore
+  @Test
+  public void testNullableCast() throws Exception {
+    testNoResult("create table dfs_test.tmp.`ttt` as select cast('AZ' as varchar(2)) as state from (values(1)) as foo");
+    List<QueryDataBatch> queryDataBatches =
+      testSqlWithResults("SELECT CASE WHEN 1=2 THEN cast(state as varchar) ELSE 'q' end as state_nm from dfs_test.tmp.`ttt` as a");
+    setColumnWidths(new int[]{50});
+    printResult(queryDataBatches);
   }
 }
