@@ -43,6 +43,7 @@ import org.apache.drill.exec.store.hive.HiveMetadataProvider.InputSplitWrapper;
 import org.apache.drill.exec.store.hive.HiveTable.HivePartition;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.mapred.InputSplit;
 
@@ -55,6 +56,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
+
+import static org.apache.drill.exec.store.hive.DrillHiveMetaStoreClient.createPartitionWithSpecColumns;
 
 @JsonTypeName("hive-scan")
 public class HiveScan extends AbstractGroupScan {
@@ -155,8 +158,9 @@ public class HiveScan extends AbstractGroupScan {
       final List<String> encodedInputSplits = Lists.newArrayList();
       final List<String> splitTypes = Lists.newArrayList();
       for (final InputSplitWrapper split : splits) {
-        if (split.getPartition() != null) {
-          parts.add(new HivePartition(split.getPartition()));
+        final Partition splitPartition = split.getPartition();
+        if (splitPartition != null) {
+          parts.add(createPartitionWithSpecColumns(hiveReadEntry.getTable(), splitPartition));
         }
 
         encodedInputSplits.add(serializeInputSplit(split.getSplit()));
@@ -166,7 +170,7 @@ public class HiveScan extends AbstractGroupScan {
         parts = null;
       }
 
-      final HiveReadEntry subEntry = new HiveReadEntry(hiveReadEntry.table, parts);
+      final HiveReadEntry subEntry = new HiveReadEntry(hiveReadEntry.getHiveTable(), parts);
       return new HiveSubScan(getUserName(), encodedInputSplits, subEntry, splitTypes, columns, storagePlugin);
     } catch (IOException | ReflectiveOperationException e) {
       throw new ExecutionSetupException(e);

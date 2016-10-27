@@ -398,12 +398,18 @@ public class HiveUtilities {
    * Wrapper around {@link MetaStoreUtils#getPartitionMetadata(Partition, Table)} which also adds parameters from table
    * to properties returned by {@link MetaStoreUtils#getPartitionMetadata(Partition, Table)}.
    *
-   * @param partition
-   * @param table
-   * @return
+   * @param partition {@link Partition} instance
+   * @param table {@link Table} instance
+   * @return properties
    */
   public static Properties getPartitionMetadata(final Partition partition, final Table table) {
-    final Properties properties = MetaStoreUtils.getPartitionMetadata(partition, table);
+    final Properties properties;
+    // exactly the same column lists for partitions and table
+    // stored only in table to reduce physical plan serialization
+    if (partition.getSd().getCols() == null) {
+      partition.getSd().setCols(table.getSd().getCols());
+    }
+    properties = MetaStoreUtils.getPartitionMetadata(partition, table);
 
     // SerDe expects properties from Table, but above call doesn't add Table properties.
     // Include Table properties in final list in order to not to break SerDes that depend on

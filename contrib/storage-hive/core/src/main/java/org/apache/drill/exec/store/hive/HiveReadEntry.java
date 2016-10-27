@@ -58,6 +58,11 @@ public class HiveReadEntry {
   }
 
   @JsonIgnore
+  public HiveTable getHiveTable() {
+    return table;
+  }
+
+  @JsonIgnore
   public List<Partition> getPartitions() {
     return partitionsUnwrapped;
   }

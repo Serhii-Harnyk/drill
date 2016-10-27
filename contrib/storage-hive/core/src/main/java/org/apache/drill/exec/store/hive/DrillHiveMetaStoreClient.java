@@ -244,9 +244,9 @@ public abstract class DrillHiveMetaStoreClient extends HiveMetaStoreClient {
   /** Helper method which gets table metadata. Retries once if the first call to fetch the metadata fails */
   protected static HiveReadEntry getHiveReadEntryHelper(final IMetaStoreClient mClient, final String dbName,
       final String tableName) throws TException {
-    Table t = null;
+    Table table = null;
     try {
-      t = mClient.getTable(dbName, tableName);
+      table = mClient.getTable(dbName, tableName);
     } catch (MetaException | NoSuchObjectException e) {
       throw e;
     } catch (TException e) {
@@ -257,10 +257,10 @@ public abstract class DrillHiveMetaStoreClient extends HiveMetaStoreClient {
         logger.warn("Failure while attempting to close existing hive metastore connection. May leak connection.", ex);
       }
       mClient.reconnect();
-      t = mClient.getTable(dbName, tableName);
+      table = mClient.getTable(dbName, tableName);
     }
 
-    if (t == null) {
+    if (table == null) {
       throw new UnknownTableException(String.format("Unable to find table '%s'.", tableName));
     }
 
@@ -281,15 +281,32 @@ public abstract class DrillHiveMetaStoreClient extends HiveMetaStoreClient {
     }
 
     List<HiveTable.HivePartition> hivePartitions = Lists.newArrayList();
-    for (Partition part : partitions) {
-      hivePartitions.add(new HiveTable.HivePartition(part));
+    for (Partition partition : partitions) {
+      hivePartitions.add(createPartitionWithSpecColumns(table, partition));
     }
 
     if (hivePartitions.size() == 0) {
       hivePartitions = null;
     }
 
-    return new HiveReadEntry(new HiveTable(t), hivePartitions);
+    return new HiveReadEntry(new HiveTable(table), hivePartitions);
+  }
+
+  /**
+   * Helper method which checks table columns and partition columns for equality.
+   * If partition and table have exactly the same columns,
+   * list stored only in table to reduce physical plan serialization.
+   *
+   * @param table table instance with column list
+   * @param partition partition instance with column list
+   * @return hive partition with columns set to null, if they are the same for table and partition
+   */
+  public static HiveTable.HivePartition createPartitionWithSpecColumns(Table table, Partition partition) {
+    HiveTable.HivePartition hivePartition = new HiveTable.HivePartition(partition);
+    if (table.getSd().getCols().equals(partition.getSd().getCols())) {
+      hivePartition.getSd().setColumns(null);
+    }
+    return hivePartition;
   }
 
   /**

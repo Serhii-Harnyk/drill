@@ -140,6 +140,9 @@ public class HiveTable {
     return sb.toString();
   }
 
+  /**
+   * Wrapper for {@link Partition} class. Used for serialization of physical plan.
+   */
   public static class HivePartition {
 
     @JsonIgnore
@@ -147,24 +150,29 @@ public class HiveTable {
 
     @JsonProperty
     public List<String> values;
+
     @JsonProperty
     public String tableName;
+
     @JsonProperty
     public String dbName;
+
     @JsonProperty
     public int createTime;
+
     @JsonProperty
     public int lastAccessTime;
+
     @JsonProperty
     public StorageDescriptorWrapper sd;
+
     @JsonProperty
-    public Map<String,String> parameters;
+    public Map<String, String> parameters;
 
     @JsonCreator
-    public HivePartition(@JsonProperty("values") List<String> values, @JsonProperty("tableName") String tableName, @JsonProperty("dbName") String dbName, @JsonProperty("createTime") int createTime,
-                         @JsonProperty("lastAccessTime") int lastAccessTime,  @JsonProperty("sd") StorageDescriptorWrapper sd,
-                         @JsonProperty("parameters") Map<String, String> parameters
-    ) {
+    public HivePartition(@JsonProperty("values") List<String> values, @JsonProperty("tableName") String tableName, @JsonProperty("dbName") String dbName,
+                         @JsonProperty("createTime") int createTime, @JsonProperty("lastAccessTime") int lastAccessTime,
+                         @JsonProperty("sd") StorageDescriptorWrapper sd, @JsonProperty("parameters") Map<String, String> parameters) {
       this.values = values;
       this.tableName = tableName;
       this.dbName = dbName;
@@ -192,6 +200,11 @@ public class HiveTable {
     }
 
     @JsonIgnore
+    public StorageDescriptorWrapper getSd() {
+      return sd;
+    }
+
+    @JsonIgnore
     public Partition getPartition() {
       return partition;
     }
@@ -206,78 +219,93 @@ public class HiveTable {
     }
   }
 
+  /**
+   * Wrapper for {@link StorageDescriptor} class.
+   * Used in {@link HivePartition} and {@link HiveTable} for serialization of physical plan.
+   */
   public static class StorageDescriptorWrapper {
+
     @JsonIgnore
     private StorageDescriptor sd;
+
     @JsonProperty
-    public List<FieldSchemaWrapper> cols;
+    public List<FieldSchemaWrapper> columns;
+
     @JsonProperty
     public String location;
+
     @JsonProperty
     public String inputFormat;
+
     @JsonProperty
     public String outputFormat;
+
     @JsonProperty
     public boolean compressed;
+
     @JsonProperty
     public int numBuckets;
+
     @JsonProperty
     public SerDeInfoWrapper serDeInfo;
-    //    @JsonProperty
-//    public List<String> bucketCols;
+
     @JsonProperty
     public List<OrderWrapper> sortCols;
+
     @JsonProperty
-    public Map<String,String> parameters;
+    public Map<String, String> parameters;
 
     @JsonCreator
-    public StorageDescriptorWrapper(@JsonProperty("cols") List<FieldSchemaWrapper> cols, @JsonProperty("location") String location, @JsonProperty("inputFormat") String inputFormat,
+    public StorageDescriptorWrapper(@JsonProperty("columns") List<FieldSchemaWrapper> columns, @JsonProperty("location") String location, @JsonProperty("inputFormat") String inputFormat,
                                     @JsonProperty("outputFormat") String outputFormat, @JsonProperty("compressed") boolean compressed, @JsonProperty("numBuckets") int numBuckets,
                                     @JsonProperty("serDeInfo") SerDeInfoWrapper serDeInfo,  @JsonProperty("sortCols") List<OrderWrapper> sortCols,
                                     @JsonProperty("parameters") Map<String,String> parameters) {
-      this.cols = cols;
+      this.columns = columns;
       this.location = location;
       this.inputFormat = inputFormat;
       this.outputFormat = outputFormat;
       this.compressed = compressed;
       this.numBuckets = numBuckets;
       this.serDeInfo = serDeInfo;
-//      this.bucketCols = bucketCols;
       this.sortCols = sortCols;
       this.parameters = parameters;
-      List<FieldSchema> colsUnwrapped = Lists.newArrayList();
-      for (FieldSchemaWrapper w: cols) {
-        colsUnwrapped.add(w.getFieldSchema());
+      List<FieldSchema> colsUnwrapped;
+      if (columns != null) {
+        colsUnwrapped = Lists.newArrayList();
+        for (FieldSchemaWrapper fieldSchema : columns) {
+          colsUnwrapped.add(fieldSchema.getFieldSchema());
+        }
+      } else {
+        colsUnwrapped = null;
       }
       SerDeInfo serDeInfoUnwrapped = serDeInfo.getSerDeInfo();
       List<Order> sortColsUnwrapped = Lists.newArrayList();
-      for (OrderWrapper w : sortCols) {
-        sortColsUnwrapped.add(w.getOrder());
+      for (OrderWrapper order : sortCols) {
+        sortColsUnwrapped.add(order.getOrder());
       }
-//      this.sd = new StorageDescriptor(colsUnwrapped, location, inputFormat, outputFormat, compressed, numBuckets, serDeInfoUnwrapped,
-//              bucketCols, sortColsUnwrapped, parameters);
-      this.sd = new StorageDescriptor(colsUnwrapped, location, inputFormat, outputFormat, compressed, numBuckets, serDeInfoUnwrapped,
-          null, sortColsUnwrapped, parameters);
+      sd = new StorageDescriptor(colsUnwrapped, location, inputFormat, outputFormat,
+        compressed, numBuckets, serDeInfoUnwrapped, null, sortColsUnwrapped, parameters);
     }
 
-    public StorageDescriptorWrapper(StorageDescriptor sd) {
-      this.sd = sd;
-      this.cols = Lists.newArrayList();
-      for (FieldSchema f : sd.getCols()) {
-        this.cols.add(new FieldSchemaWrapper(f));
+    public StorageDescriptorWrapper(StorageDescriptor storageDescriptor) {
+      sd = storageDescriptor;
+      location = storageDescriptor.getLocation();
+      inputFormat = storageDescriptor.getInputFormat();
+      outputFormat = storageDescriptor.getOutputFormat();
+      compressed = storageDescriptor.isCompressed();
+      numBuckets = storageDescriptor.getNumBuckets();
+      serDeInfo = new SerDeInfoWrapper(storageDescriptor.getSerdeInfo());
+      sortCols = Lists.newArrayList();
+      for (Order order : storageDescriptor.getSortCols()) {
+        sortCols.add(new OrderWrapper(order));
       }
-      this.location = sd.getLocation();
-      this.inputFormat = sd.getInputFormat();
-      this.outputFormat = sd.getOutputFormat();
-      this.compressed = sd.isCompressed();
-      this.numBuckets = sd.getNumBuckets();
-      this.serDeInfo = new SerDeInfoWrapper(sd.getSerdeInfo());
-//      this.bucketCols = sd.getBucketCols();
-      this.sortCols = Lists.newArrayList();
-      for (Order o : sd.getSortCols()) {
-        this.sortCols.add(new OrderWrapper(o));
+      parameters = storageDescriptor.getParameters();
+      if (sd.getCols() != null) {
+        this.columns = Lists.newArrayList();
+        for (FieldSchema fieldSchema : sd.getCols()) {
+          this.columns.add(new FieldSchemaWrapper(fieldSchema));
+        }
       }
-      this.parameters = sd.getParameters();
     }
 
     @JsonIgnore
@@ -285,6 +313,23 @@ public class HiveTable {
       return sd;
     }
 
+    @JsonIgnore
+    public void setColumns(List<FieldSchema> columns) {
+      sd.setCols(columns);
+      if (columns != null) {
+        this.columns = Lists.newArrayList();
+        for (FieldSchema fieldSchema : columns) {
+          this.columns.add(new FieldSchemaWrapper(fieldSchema));
+        }
+      } else {
+        this.columns = null;
+      }
+    }
+
+    @JsonIgnore
+    public List<FieldSchemaWrapper> getColumns() {
+      return columns;
+    }
   }
 
   public static class SerDeInfoWrapper {
