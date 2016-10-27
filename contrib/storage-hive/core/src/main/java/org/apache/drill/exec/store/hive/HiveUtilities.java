@@ -395,15 +395,17 @@ public class HiveUtilities {
   }
 
   /**
-   * Wrapper around {@link MetaStoreUtils#getPartitionMetadata(Partition, Table)} which also adds parameters from table
-   * to properties returned by {@link MetaStoreUtils#getPartitionMetadata(Partition, Table)}.
+   * Adds parameters from table to properties returned by
+   * method {@link MetaStoreUtils.getSchema(StorageDescriptor, StorageDescriptor, Map<String, String>, String, String,
+   * java.util.List<org.apache.hadoop.hive.metastore.api.FieldSchema>)}.
    *
    * @param partition
    * @param table
    * @return
    */
   public static Properties getPartitionMetadata(final Partition partition, final Table table) {
-    final Properties properties = MetaStoreUtils.getPartitionMetadata(partition, table);
+    final Properties properties = MetaStoreUtils.getSchema(partition.getSd(), table.getSd(), partition.getParameters(),
+      table.getDbName(), table.getTableName(), table.getPartitionKeys());
 
     // SerDe expects properties from Table, but above call doesn't add Table properties.
     // Include Table properties in final list in order to not to break SerDes that depend on

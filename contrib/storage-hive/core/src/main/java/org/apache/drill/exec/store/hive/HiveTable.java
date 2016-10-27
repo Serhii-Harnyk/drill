@@ -92,7 +92,7 @@ public class HiveTable {
       partitionKeysUnwrapped.add(w.getFieldSchema());
       partitionNameTypeMap.put(w.name, w.type);
     }
-    StorageDescriptor sdUnwrapped = sd.getSd();
+    StorageDescriptor sdUnwrapped = sd.getStorageDescriptor();
     this.table = new Table(tableName, dbName, owner, createTime, lastAccessTime, retention, sdUnwrapped, partitionKeysUnwrapped,
         parameters, viewOriginalText, viewExpandedText, tableType);
   }
@@ -142,29 +142,35 @@ public class HiveTable {
 
   public static class HivePartition {
 
+    @JsonProperty
+    public List<String> values;
+
+    @JsonProperty
+    public String tableName;
+
+    @JsonProperty
+    public String dbName;
+
+    @JsonProperty
+    public int createTime;
+
+    @JsonProperty
+    public int lastAccessTime;
+
+    @JsonProperty
+    public PartitionStorageDescriptorWrapper sd;
+
+    @JsonProperty
+    public Map<String, String> parameters;
+
     @JsonIgnore
     private Partition partition;
 
-    @JsonProperty
-    public List<String> values;
-    @JsonProperty
-    public String tableName;
-    @JsonProperty
-    public String dbName;
-    @JsonProperty
-    public int createTime;
-    @JsonProperty
-    public int lastAccessTime;
-    @JsonProperty
-    public StorageDescriptorWrapper sd;
-    @JsonProperty
-    public Map<String,String> parameters;
-
     @JsonCreator
-    public HivePartition(@JsonProperty("values") List<String> values, @JsonProperty("tableName") String tableName, @JsonProperty("dbName") String dbName, @JsonProperty("createTime") int createTime,
-                         @JsonProperty("lastAccessTime") int lastAccessTime,  @JsonProperty("sd") StorageDescriptorWrapper sd,
-                         @JsonProperty("parameters") Map<String, String> parameters
-    ) {
+    public HivePartition(@JsonProperty("values") List<String> values, @JsonProperty("tableName") String tableName,
+                         @JsonProperty("dbName") String dbName, @JsonProperty("createTime") int createTime,
+                         @JsonProperty("lastAccessTime") int lastAccessTime, @JsonProperty("sd") PartitionStorageDescriptorWrapper sd,
+                         @JsonProperty("parameters") Map<String, String> parameters) {
       this.values = values;
       this.tableName = tableName;
       this.dbName = dbName;
@@ -187,7 +193,7 @@ public class HiveTable {
       this.dbName = partition.getDbName();
       this.createTime = partition.getCreateTime();
       this.lastAccessTime = partition.getLastAccessTime();
-      this.sd = new StorageDescriptorWrapper(partition.getSd());
+      this.sd = new PartitionStorageDescriptorWrapper(partition.getSd());
       this.parameters = partition.getParameters();
     }
 
@@ -206,85 +212,123 @@ public class HiveTable {
     }
   }
 
-  public static class StorageDescriptorWrapper {
+  /**
+   * Wrapper for StorageDescriptor class without field columns.
+   * Used in HivePartition for serialization issues and reducing the size of serialized physical plan
+   */
+  public static class PartitionStorageDescriptorWrapper {
+
     @JsonIgnore
     private StorageDescriptor sd;
-    @JsonProperty
-    public List<FieldSchemaWrapper> cols;
+
     @JsonProperty
     public String location;
+
     @JsonProperty
     public String inputFormat;
+
     @JsonProperty
     public String outputFormat;
+
     @JsonProperty
     public boolean compressed;
+
     @JsonProperty
     public int numBuckets;
+
     @JsonProperty
     public SerDeInfoWrapper serDeInfo;
-    //    @JsonProperty
-//    public List<String> bucketCols;
+
     @JsonProperty
     public List<OrderWrapper> sortCols;
+
     @JsonProperty
-    public Map<String,String> parameters;
+    public Map<String, String> parameters;
 
     @JsonCreator
-    public StorageDescriptorWrapper(@JsonProperty("cols") List<FieldSchemaWrapper> cols, @JsonProperty("location") String location, @JsonProperty("inputFormat") String inputFormat,
-                                    @JsonProperty("outputFormat") String outputFormat, @JsonProperty("compressed") boolean compressed, @JsonProperty("numBuckets") int numBuckets,
-                                    @JsonProperty("serDeInfo") SerDeInfoWrapper serDeInfo,  @JsonProperty("sortCols") List<OrderWrapper> sortCols,
-                                    @JsonProperty("parameters") Map<String,String> parameters) {
-      this.cols = cols;
+    public PartitionStorageDescriptorWrapper(@JsonProperty("location") String location, @JsonProperty("inputFormat") String inputFormat, @JsonProperty("outputFormat") String outputFormat, @JsonProperty("compressed") boolean compressed, @JsonProperty("numBuckets") int numBuckets, @JsonProperty("serDeInfo") SerDeInfoWrapper serDeInfo, @JsonProperty("sortCols") List<OrderWrapper> sortCols, @JsonProperty("parameters") Map<String, String> parameters) {
       this.location = location;
       this.inputFormat = inputFormat;
       this.outputFormat = outputFormat;
       this.compressed = compressed;
       this.numBuckets = numBuckets;
       this.serDeInfo = serDeInfo;
-//      this.bucketCols = bucketCols;
       this.sortCols = sortCols;
       this.parameters = parameters;
-      List<FieldSchema> colsUnwrapped = Lists.newArrayList();
-      for (FieldSchemaWrapper w: cols) {
-        colsUnwrapped.add(w.getFieldSchema());
-      }
-      SerDeInfo serDeInfoUnwrapped = serDeInfo.getSerDeInfo();
-      List<Order> sortColsUnwrapped = Lists.newArrayList();
-      for (OrderWrapper w : sortCols) {
-        sortColsUnwrapped.add(w.getOrder());
-      }
-//      this.sd = new StorageDescriptor(colsUnwrapped, location, inputFormat, outputFormat, compressed, numBuckets, serDeInfoUnwrapped,
-//              bucketCols, sortColsUnwrapped, parameters);
-      this.sd = new StorageDescriptor(colsUnwrapped, location, inputFormat, outputFormat, compressed, numBuckets, serDeInfoUnwrapped,
-          null, sortColsUnwrapped, parameters);
+      createStorageDescriptor(null);
     }
 
-    public StorageDescriptorWrapper(StorageDescriptor sd) {
-      this.sd = sd;
-      this.cols = Lists.newArrayList();
-      for (FieldSchema f : sd.getCols()) {
-        this.cols.add(new FieldSchemaWrapper(f));
-      }
-      this.location = sd.getLocation();
-      this.inputFormat = sd.getInputFormat();
-      this.outputFormat = sd.getOutputFormat();
-      this.compressed = sd.isCompressed();
-      this.numBuckets = sd.getNumBuckets();
-      this.serDeInfo = new SerDeInfoWrapper(sd.getSerdeInfo());
-//      this.bucketCols = sd.getBucketCols();
+    public PartitionStorageDescriptorWrapper(StorageDescriptor storageDescriptor) {
+      this.sd = storageDescriptor;
+      this.location = storageDescriptor.getLocation();
+      this.inputFormat = storageDescriptor.getInputFormat();
+      this.outputFormat = storageDescriptor.getOutputFormat();
+      this.compressed = storageDescriptor.isCompressed();
+      this.numBuckets = storageDescriptor.getNumBuckets();
+      this.serDeInfo = new SerDeInfoWrapper(storageDescriptor.getSerdeInfo());
       this.sortCols = Lists.newArrayList();
-      for (Order o : sd.getSortCols()) {
-        this.sortCols.add(new OrderWrapper(o));
+      for (Order order : storageDescriptor.getSortCols()) {
+        this.sortCols.add(new OrderWrapper(order));
       }
-      this.parameters = sd.getParameters();
+      this.parameters = storageDescriptor.getParameters();
+    }
+
+    /**
+     * Creates StorageDescriptor object with field columnsUnwrapped.
+     *
+     * @param columnsUnwrapped
+     */
+    public void createStorageDescriptor(List<FieldSchema> columnsUnwrapped) {
+      SerDeInfo serDeInfoUnwrapped = serDeInfo.getSerDeInfo();
+      List<Order> sortColsUnwrapped = Lists.newArrayList();
+      for (OrderWrapper orderWrapper : sortCols) {
+        sortColsUnwrapped.add(orderWrapper.getOrder());
+      }
+      sd = new StorageDescriptor(columnsUnwrapped, location, inputFormat, outputFormat,
+        compressed, numBuckets, serDeInfoUnwrapped, null, sortColsUnwrapped, parameters);
     }
 
     @JsonIgnore
     public StorageDescriptor getSd() {
       return sd;
     }
+  }
 
+  /**
+   * Wrapper for StorageDescriptor class.
+   * Used in HiveTable for serialization issues
+   */
+  public static class StorageDescriptorWrapper {
+    @JsonProperty
+    public PartitionStorageDescriptorWrapper storageDescriptorWrapper;
+
+    @JsonProperty
+    public List<FieldSchemaWrapper> columns;
+
+    @JsonCreator
+    public StorageDescriptorWrapper(@JsonProperty("storageDescriptorWrapper") PartitionStorageDescriptorWrapper storageDescriptorWrapper,
+                                    @JsonProperty("columns") List<FieldSchemaWrapper> columns) {
+      this.storageDescriptorWrapper = storageDescriptorWrapper;
+      this.columns = columns;
+      List<FieldSchema> colsUnwrapped = Lists.newArrayList();
+      for (FieldSchemaWrapper fieldSchemaWrapper : columns) {
+        colsUnwrapped.add(fieldSchemaWrapper.getFieldSchema());
+      }
+      this.storageDescriptorWrapper.createStorageDescriptor(colsUnwrapped);
+    }
+
+    public StorageDescriptorWrapper(StorageDescriptor storageDescriptor) {
+      storageDescriptorWrapper = new PartitionStorageDescriptorWrapper(storageDescriptor);
+      columns = Lists.newArrayList();
+      for (FieldSchema fieldSchema : storageDescriptor.getCols()) {
+        columns.add(new FieldSchemaWrapper(fieldSchema));
+      }
+    }
+
+    @JsonIgnore
+    public StorageDescriptor getStorageDescriptor() {
+      return storageDescriptorWrapper.getSd();
+    }
   }
 
   public static class SerDeInfoWrapper {
