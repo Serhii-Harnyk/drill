@@ -37,6 +37,7 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.FileUtils;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.record.RecordBatchLoader;
@@ -717,6 +718,39 @@ public class TestJsonReader extends BaseTestQuery {
       java.nio.file.Files.delete(new File(path, "json_null_fields.json").toPath());
       java.nio.file.Files.delete(new File(path, "json_nested_null_fields.json").toPath());
       java.nio.file.Files.delete(path.toPath());
+    }
+  }
+
+
+  /**
+   * See DRILL-4653 and DRILL-4842
+   */
+  @Test
+  public void testSelectStarWithAllTextModeAndInvalidRecords() throws Exception {
+    File path = new File(BaseTestQuery.getTempDir("json/input"));
+    path.mkdirs();
+    String pathString = path.toPath().toString();
+
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(path, "json_nested_null_fields_with_err.json")))) {
+      writer.write("{\"c11\":null, \"c2\":{\"c0\":{\"c11\": \"1\", \"c1\": {\"c0: null}}, \"c1\": \"I am not NULL\"}}"
+        + "{\"c11\":null, \"c2\":{\"c0\":{\"c11\": \"2\", \"c1\": {\"c0\": null}}, \"c1\": \"I am not NULL\"}}"
+        + "{\"c11\":null, \"c2\":{\"c0\":{\"c11\": \"3\", \"c1\": {\"c0\": null}}, \"c1\": \"I am not NULL\"}}"
+        + "{\"c11\":null, \"c2\":{\"c0\":{\"c11\": \"4\", \"c1\": {\"c0\": null}}, \"c1\": \"I am not NULL\"}}");
+    }
+
+    try {
+      testNoResult("alter session set `" + ExecConstants.JSON_ALL_TEXT_MODE + "` = true");
+
+      testNoResult("alter session set `" + ExecConstants.JSON_READER_SKIP_INVALID_RECORDS_FLAG + "` = true");
+
+      testBuilder()
+        .unOrdered()
+        .sqlQuery(String.format("select * from dfs_test.`%s/json_nested_null_fields_with_err.json` t WHERE t.c2.c0.c1.c0 IN ('Hello World')", pathString))
+        .expectsEmptyResultSet();
+    } finally {
+      testNoResult("alter session reset `" + ExecConstants.JSON_READER_SKIP_INVALID_RECORDS_FLAG + "`");
+      testNoResult("alter session reset `" + ExecConstants.JSON_ALL_TEXT_MODE + "`");
+      java.nio.file.Files.delete(new File(path, "json_nested_null_fields_with_err.json").toPath());
     }
   }
 }

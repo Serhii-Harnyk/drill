@@ -244,6 +244,7 @@ public class JsonReader extends BaseJsonProcessor {
       }
     } catch (com.fasterxml.jackson.core.JsonParseException ex) {
       if (ignoreJSONParseError()) {
+        path.clear();
         if (processJSONException() == JsonExceptionProcessingState.END_OF_STREAM) {
           return ReadState.JSON_RECORD_PARSE_EOF_ERROR;
         } else {
