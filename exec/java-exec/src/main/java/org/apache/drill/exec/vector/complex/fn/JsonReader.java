@@ -17,22 +17,20 @@
  */
 package org.apache.drill.exec.vector.complex.fn;
 
-import com.google.common.collect.Sets;
+import com.google.common.collect.Maps;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.BitSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
-import org.apache.drill.exec.store.easy.json.JsonProcessor.ReadState;
 import org.apache.drill.exec.store.easy.json.reader.BaseJsonProcessor;
-import org.apache.drill.exec.store.easy.json.reader.BaseJsonProcessor.JsonExceptionProcessingState;
 import org.apache.drill.exec.vector.complex.fn.VectorOutput.ListVectorOutput;
 import org.apache.drill.exec.vector.complex.fn.VectorOutput.MapVectorOutput;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter;
@@ -60,12 +58,13 @@ public class JsonReader extends BaseJsonProcessor {
   private final boolean extended = true;
   private final boolean readNumbersAsDouble;
   private List<String> path = Lists.newArrayList();
+  private Map<List<String>, MapWriter> fieldPathWriter = Maps.newLinkedHashMap();
 
   /**
    * Collection for tracking nullable fields during reading
    * and storing them for creating default typed vectors
    */
-  private final Set<List<String>> nullableFields  = Sets.newLinkedHashSet();
+  private List<List<String>> notNullColumnsList = Lists.newLinkedList();
 
   /**
    * Describes whether or not this reader can unwrap a single root array record
@@ -160,12 +159,10 @@ public class JsonReader extends BaseJsonProcessor {
     }
 
     if (checkNullFields(fieldPathList)) {
-      for (List<String> fieldPath : nullableFields) {
-        BaseWriter.MapWriter fieldWriter = writer.rootAsMap();
-        for (int i = 0; i < fieldPath.size() - 1; i++) {
-          fieldWriter = fieldWriter.map(fieldPath.get(i));
+      for (Map.Entry<List<String>, MapWriter> fieldPath : fieldPathWriter.entrySet()) {
+        if(fieldPath.getValue() != null) {
+          initializeFieldWriter(fieldPath.getValue(), fieldPath.getKey().get(fieldPath.getKey().size() - 1));
         }
-        initializeFieldWriter(fieldWriter, fieldPath.get(fieldPath.size() - 1));
       }
     }
   }
@@ -182,7 +179,7 @@ public class JsonReader extends BaseJsonProcessor {
    * Check query having a '*' and existing nullable fields in result
    */
   private boolean checkNullFields(List<PathSegment> fieldPathList) {
-    return (fieldPathList.size() == 1) && fieldPathList.get(0).getNameSegment().getPath().equals("*") && !nullableFields.isEmpty();
+    return (fieldPathList.size() == 1) && fieldPathList.get(0).getNameSegment().getPath().equals("*") && !fieldPathWriter.isEmpty();
   }
 
   public void setSource(int start, int end, DrillBuf buf) throws IOException {
@@ -411,6 +408,7 @@ public class JsonReader extends BaseJsonProcessor {
           break;
         case START_OBJECT:
           if (!writeMapDataIfTyped(map, fieldName)) {
+            addNotNullColumn(fieldName);
             path.add(fieldName);
             writeData(map.map(fieldName), childSelection, false);
           }
@@ -419,20 +417,28 @@ public class JsonReader extends BaseJsonProcessor {
           break outside;
 
         case VALUE_FALSE: {
+          addNotNullColumn(fieldName);
           map.bit(fieldName).writeBit(0);
           break;
         }
         case VALUE_TRUE: {
+          addNotNullColumn(fieldName);
           map.bit(fieldName).writeBit(1);
           break;
         }
         case VALUE_NULL:
-          putFieldPath(fieldName);
+          List<String> fieldPath = Lists.newArrayList(path);
+          fieldPath.add(fieldName);
+          if(!notNullColumnsList.contains(fieldPath)) {
+            fieldPathWriter.put(fieldPath, map);
+          }
           break;
         case VALUE_NUMBER_FLOAT:
+          addNotNullColumn(fieldName);
           map.float8(fieldName).writeFloat8(parser.getDoubleValue());
           break;
         case VALUE_NUMBER_INT:
+          addNotNullColumn(fieldName);
           if (this.readNumbersAsDouble) {
             map.float8(fieldName).writeFloat8(parser.getDoubleValue());
           } else {
@@ -440,6 +446,7 @@ public class JsonReader extends BaseJsonProcessor {
           }
           break;
         case VALUE_STRING:
+          addNotNullColumn(fieldName);
           handleString(parser, map, fieldName);
           break;
 
@@ -494,10 +501,12 @@ public class JsonReader extends BaseJsonProcessor {
 
       switch (parser.nextToken()) {
       case START_ARRAY:
+        addNotNullColumn(fieldName);
         writeDataAllText(map.list(fieldName));
         break;
       case START_OBJECT:
         if (!writeMapDataIfTyped(map, fieldName)) {
+          addNotNullColumn(fieldName);
           path.add(fieldName);
           writeDataAllText(map.map(fieldName), childSelection, false);
         }
@@ -511,10 +520,15 @@ public class JsonReader extends BaseJsonProcessor {
       case VALUE_NUMBER_FLOAT:
       case VALUE_NUMBER_INT:
       case VALUE_STRING:
+        addNotNullColumn(fieldName);
         handleString(parser, map, fieldName);
         break;
       case VALUE_NULL:
-        putFieldPath(fieldName);
+        List<String> fieldPath = Lists.newArrayList(path);
+        fieldPath.add(fieldName);
+        if(!notNullColumnsList.contains(fieldPath)) {
+          fieldPathWriter.put(fieldPath, map);
+        }
         break;
 
       default:
@@ -524,17 +538,17 @@ public class JsonReader extends BaseJsonProcessor {
       }
     }
     map.end();
-
   }
 
   /**
-   * Puts copy of field path list to nullableFields set.
+   * Puts copy of field path list to list of not null fields.
    * @param fieldName
    */
-  private void putFieldPath(String fieldName) {
+  private void addNotNullColumn(String fieldName) {
     List<String> fieldPath = Lists.newArrayList(path);
     fieldPath.add(fieldName);
-    nullableFields.add(fieldPath);
+    notNullColumnsList.add(fieldPath);
+    fieldPathWriter.remove(fieldPath);
   }
 
   /**

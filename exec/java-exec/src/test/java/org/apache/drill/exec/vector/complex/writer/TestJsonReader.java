@@ -32,8 +32,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.Random;
 import java.util.zip.GZIPOutputStream;
 
+import com.google.common.base.Stopwatch;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.FileUtils;
@@ -56,9 +58,11 @@ import com.google.common.io.Files;
 import org.junit.rules.TemporaryFolder;
 
 public class TestJsonReader extends BaseTestQuery {
-//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestJsonReader.class);
+  //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestJsonReader.class);
 
   private static final boolean VERBOSE_DEBUG = false;
+
+  public static final Random RANDOM = new Random();
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -751,6 +755,86 @@ public class TestJsonReader extends BaseTestQuery {
       testNoResult("alter session reset `" + ExecConstants.JSON_READER_SKIP_INVALID_RECORDS_FLAG + "`");
       testNoResult("alter session reset `" + ExecConstants.JSON_ALL_TEXT_MODE + "`");
       java.nio.file.Files.delete(new File(path, "json_nested_null_fields_with_err.json").toPath());
+    }
+  }
+
+//  public static void main(String[] args) throws IOException {
+//    StringBuilder sb = new StringBuilder();
+//    int maxRecordCount = 10;
+//    int maxInner = 4;
+//    double possibilityOfNull = 0.99;
+//    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/home/user515050/test.json")))) {
+//      for (int i = 0; i < maxRecordCount; i++) {
+//        appendRandStringCount(maxInner, maxRecordCount, writer, possibilityOfNull);
+//      }
+//    }
+//  }
+
+  private static void appendRandStringCount(int maxInner, int maxRecordCount, BufferedWriter writer, double possibility) throws IOException {
+    if (maxInner > 1) {
+      writer.write("{");
+      for (int i = 1; i < maxRecordCount; i++) {
+//        if (RANDOM.nextDouble() >= possibility) {
+          writer.write(
+            new StringBuilder("\"c")
+              .append(i)
+              .append("\":")
+              .toString());
+          appendRandStringCount(maxInner - 1, RANDOM.nextInt(maxRecordCount) + 1, writer, possibility);
+          writer.write(", \n");
+//        }
+      }
+      writer.write(
+        new StringBuilder("\"c")
+          .append(maxRecordCount)
+          .append("\":")
+          .toString());
+      appendRandStringCount(maxInner - 1, RANDOM.nextInt(maxRecordCount) + 1, writer, possibility);
+      writer.write("}");
+    } else {
+      writer.write("{");
+      for (int i = 0; i < maxRecordCount; i++) {
+        if (RANDOM.nextDouble() <= possibility) {
+          writer.write(
+            new StringBuilder("\"c")
+              .append(i)
+              .append("\":null, \n")
+              .toString());
+        } else {
+          writer.write(
+            new StringBuilder("\"c")
+              .append(i)
+              .append("\":\"Hello World!\", \n")
+              .toString());
+        }
+      }
+      if (RANDOM.nextDouble() <= possibility) {
+        writer.write(
+          new StringBuilder("\"c")
+            .append(maxRecordCount)
+            .append("\":null}")
+            .toString());
+      } else {
+        writer.write(
+          new StringBuilder("\"c")
+            .append(maxRecordCount)
+            .append("\":\"Hello World!\"}")
+            .toString());
+      }
+    }
+  }
+
+  @Ignore
+  @Test
+  public void testLocal() throws Exception {
+    final Stopwatch watch = Stopwatch.createStarted();
+    testNoResult("alter session set `store.json.all_text_mode` = true");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/home/user515050/test.txt")))) {
+      for (int i = 0; i < 10; i++) {
+        long currentTimeMillis = System.currentTimeMillis();
+        test("select * from dfs.`/home/user515050/test.json`");
+        writer.write((System.currentTimeMillis() - currentTimeMillis) + " ");
+      }
     }
   }
 }
