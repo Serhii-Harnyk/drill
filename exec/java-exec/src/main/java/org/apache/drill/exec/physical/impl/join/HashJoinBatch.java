@@ -65,6 +65,8 @@ import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JVar;
 
 public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(HashJoinBatch.class);
+
   public static final long ALLOCATOR_INITIAL_RESERVATION = 1 * 1024 * 1024;
   public static final long ALLOCATOR_MAX_RESERVATION = 20L * 1000 * 1000 * 1000;
 
@@ -345,7 +347,8 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
           setupHashTable();
         } else {
           if (!rightSchema.equals(right.getSchema())) {
-            throw new SchemaChangeException("Hash join does not support schema changes");
+            logger.warn("Hash join hit schema changes on build side. Previous batch schema: {}. Current batch schema: {}", rightSchema, right.getSchema());
+            throw new SchemaChangeException(String.format("Hash join does not support schema changes on build side. Previous batch schema: %s. Current batch schema: %s", rightSchema, right.getSchema()));
           }
           hashTable.updateBatches();
         }

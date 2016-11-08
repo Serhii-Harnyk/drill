@@ -34,6 +34,7 @@ import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.calcite.rel.core.JoinRelType;
 
 public abstract class HashJoinProbeTemplate implements HashJoinProbe {
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(HashJoinProbeTemplate.class);
 
   // Probe side record batch
   private RecordBatch probeBatch;
@@ -138,7 +139,10 @@ public abstract class HashJoinProbeTemplate implements HashJoinProbe {
               doSetup(outgoingJoinBatch.getContext(), buildBatch, probeBatch, outgoingJoinBatch);
               hashTable.updateBatches();
             } else {
-              throw new SchemaChangeException("Hash join does not support schema changes");
+              logger.warn("Hash join hit schema changes on probe side. Previous batch schema: {}. Current batch schema: {}", probeSchema, probeBatch.getSchema());
+              throw new SchemaChangeException(
+                  String.format("Hash join does not support schema changes on probe side. Previous batch schema: %s. Current batch schema: %s",
+                      probeSchema, probeBatch.getSchema()));
             }
           case OK:
             recordsToProcess = probeBatch.getRecordCount();
