@@ -58,6 +58,7 @@ import org.apache.drill.exec.proto.UserProtos.CreatePreparedStatementResp;
 import org.apache.drill.exec.proto.UserProtos.RequestStatus;
 import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.RpcException;
+import org.apache.drill.exec.rpc.InvalidConnectionInfoException;
 import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.RemoteServiceSet;
 import org.apache.drill.exec.store.StoragePluginRegistry;
@@ -155,7 +156,9 @@ class DrillConnectionImpl extends AvaticaConnection
       }
     } catch (OutOfMemoryException e) {
       throw new SQLException("Failure creating root allocator", e);
-    } catch (RpcException e) {
+    }catch (InvalidConnectionInfoException e){
+      throw new SQLException("Invalid parameter in connection string: " + e.getMessage(), e);
+    }catch (RpcException e) {
       // (Include cause exception's text in wrapping exception's text so
       // it's more likely to get to user (e.g., via SQLLine), and use
       // toString() since getMessage() text doesn't always mention error:)
