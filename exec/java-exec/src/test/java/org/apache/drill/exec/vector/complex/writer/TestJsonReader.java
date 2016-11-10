@@ -32,6 +32,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
+import java.util.Random;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.drill.BaseTestQuery;
@@ -56,8 +57,6 @@ import com.google.common.io.Files;
 import org.junit.rules.TemporaryFolder;
 
 public class TestJsonReader extends BaseTestQuery {
-//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestJsonReader.class);
-
   private static final boolean VERBOSE_DEBUG = false;
 
   @Rule
@@ -752,5 +751,105 @@ public class TestJsonReader extends BaseTestQuery {
       testNoResult("alter session reset `" + ExecConstants.JSON_ALL_TEXT_MODE + "`");
       java.nio.file.Files.delete(new File(path, "json_nested_null_fields_with_err.json").toPath());
     }
+  }
+
+  public static final Random RANDOM = new Random();
+
+  @Ignore
+  @Test
+  public void generateJsons() throws IOException {
+    StringBuilder sb = new StringBuilder();
+    int maxRecordCount = 10;
+    int maxInner = 4;
+    createJsonWithPossibility(maxRecordCount, maxInner, 0.001);
+    createJsonWithPossibility(maxRecordCount, maxInner, 0.1);
+    createJsonWithPossibility(maxRecordCount, maxInner, 0.5);
+    createJsonWithPossibility(maxRecordCount, maxInner, 0.7);
+    createJsonWithPossibility(maxRecordCount, maxInner, 0.99);
+  }
+
+  private void createJsonWithPossibility(int maxRecordCount, int maxInner, double possibilityOfNull) throws IOException {
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/tmp", "/test" + possibilityOfNull + ".json")))) {
+      for (int i = 0; i < maxRecordCount; i++) {
+        appendRandStringCount(maxInner, maxRecordCount, writer, possibilityOfNull);
+      }
+    }
+  }
+
+  private static void appendRandStringCount(int maxInner, int maxRecordCount, BufferedWriter writer, double possibility) throws IOException {
+    if (maxInner > 1) {
+      writer.write("{");
+      for (int i = 1; i < maxRecordCount; i++) {
+//        if (RANDOM.nextDouble() >= possibility) {
+        writer.write(
+          new StringBuilder("\"c")
+            .append(i)
+            .append("\":")
+            .toString());
+        appendRandStringCount(maxInner - 1, RANDOM.nextInt(maxRecordCount) + 1, writer, possibility);
+        writer.write(", \n");
+//        }
+      }
+      writer.write(
+        new StringBuilder("\"c")
+          .append(maxRecordCount)
+          .append("\":")
+          .toString());
+      appendRandStringCount(maxInner - 1, RANDOM.nextInt(maxRecordCount) + 1, writer, possibility);
+      writer.write("}");
+    } else {
+      writer.write("{");
+      for (int i = 0; i < maxRecordCount; i++) {
+        if (RANDOM.nextDouble() <= possibility) {
+          writer.write(
+            new StringBuilder("\"c")
+              .append(i)
+              .append("\":null, \n")
+              .toString());
+        } else {
+          writer.write(
+            new StringBuilder("\"c")
+              .append(i)
+              .append("\":\"Hello World!\", \n")
+              .toString());
+        }
+      }
+      if (RANDOM.nextDouble() <= possibility) {
+        writer.write(
+          new StringBuilder("\"c")
+            .append(maxRecordCount)
+            .append("\":null}")
+            .toString());
+      } else {
+        writer.write(
+          new StringBuilder("\"c")
+            .append(maxRecordCount)
+            .append("\":\"Hello World!\"}")
+            .toString());
+      }
+    }
+  }
+
+  @Ignore
+  @Test
+  public void runPerformance() throws Exception {
+    testNoResult("alter session set `store.json.all_text_mode` = true");
+    try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File("/tmp/test.txt")))) {
+      executeIteration(0.001, writer);
+      executeIteration(0.1, writer);
+      executeIteration(0.5, writer);
+      executeIteration(0.7, writer);
+      executeIteration(0.99, writer);
+    }
+  }
+
+  private void executeIteration(double p, BufferedWriter writer) throws Exception {
+    for (int i = 0; i < 10; i++) {
+      long currentTimeMillis = System.currentTimeMillis();
+      test("select * from dfs.`/tmp/test" + p +".json`");
+      writer.write((System.currentTimeMillis() - currentTimeMillis) + " ");
+    }
+    writer.write("\n");
+    System.out.println(p + " iteration");
   }
 }
