@@ -331,6 +331,9 @@ public class ScanBatch implements CloseableRecordBatch {
                                               Class<T> clazz) throws SchemaChangeException {
       // Check if the field exists.
       ValueVector v = fieldVectorMap.get(field.getPath());
+      if (v != null && v.getClass() != clazz) {
+        v.clear();
+      }
       if (v == null || v.getClass() != clazz) {
         // Field does not exist--add it to the map and the output container.
         v = TypeHelper.getNewVector(field, oContext.getAllocator(), callBack);
@@ -345,10 +348,10 @@ public class ScanBatch implements CloseableRecordBatch {
         final ValueVector old = fieldVectorMap.put(field.getPath(), v);
         if (old != null) {
           old.clear();
-          container.remove(old);
+          container.replace(old, v);
+        } else {
+          container.add(v);
         }
-
-        container.add(v);
         // Added new vectors to the container--mark that the schema has changed.
         schemaChanged = true;
       }

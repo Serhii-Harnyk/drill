@@ -126,9 +126,9 @@ public class ${mode}MapWriter extends AbstractFieldWriter {
     FieldWriter writer = fields.get(name.toLowerCase());
     int vectorCount = container.size();
     if(writer == null) {
-      if (!unionEnabled){
-        writer = new SingleListWriter(name,container,this);
-      } else{
+      if (!unionEnabled) {
+        writer = new SingleListWriter(name, container, this);
+      } else {
         writer = new PromotableWriter(container.addOrGet(name, Types.optional(MinorType.LIST), ListVector.class), container);
       }
       if (container.size() > vectorCount) {

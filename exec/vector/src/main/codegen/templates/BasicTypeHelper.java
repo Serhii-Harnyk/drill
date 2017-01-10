@@ -25,6 +25,8 @@ package org.apache.drill.exec.expr;
 
 <#include "/@includes/vv_imports.ftl" />
 import org.apache.drill.exec.vector.complex.UnionVector;
+import org.apache.drill.exec.vector.RepeatedZeroVector;
+import org.apache.drill.exec.vector.ZeroVector;
 import org.apache.drill.common.types.TypeProtos.DataMode;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.TypeProtos.MajorType;
@@ -95,6 +97,14 @@ public class BasicTypeHelper {
       case REQUIRED:
       case OPTIONAL:
         return ListVector.class;
+      }
+
+    case LATE:
+      switch (mode) {
+        case OPTIONAL:
+          return ZeroVector.class;
+        case REPEATED:
+          return RepeatedZeroVector.class;
       }
     
 <#list vv.types as type>
@@ -260,6 +270,15 @@ public class BasicTypeHelper {
       case REQUIRED:
         return new ListVector(field, allocator, callBack);
       }
+
+    case LATE:
+      switch (type.getMode()) {
+        case OPTIONAL:
+          return ZeroVector.INSTANCE;
+        case REPEATED:
+          return new RepeatedZeroVector(field, allocator);
+      }
+
 <#list vv.  types as type>
   <#list type.minor as minor>
     case ${minor.class?upper_case}:

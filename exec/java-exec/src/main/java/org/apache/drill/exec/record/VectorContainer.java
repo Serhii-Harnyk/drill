@@ -250,7 +250,7 @@ public class VectorContainer implements Iterable<VectorWrapper<?>>, VectorAccess
     throw new IllegalStateException("You attempted to remove a vector that didn't exist.");
   }
 
-  private void replace(ValueVector old, ValueVector newVector) {
+  public void replace(ValueVector old, ValueVector newVector) {
     schema = null;
     schemaChanged = true;
     int i = 0;

@@ -106,9 +106,16 @@ public class ${mode}ListWriter extends AbstractFieldWriter {
     case INIT:
       int vectorCount = container.size();
       final RepeatedMapVector vector = container.addOrGet(name, RepeatedMapVector.TYPE, RepeatedMapVector.class);
+      <#if mode == "Single">
+      final ValueVector oldVector = innerVector;
+      </#if>
       innerVector = vector;
       writer = new RepeatedMapWriter(vector, this);
+      <#if mode == "Single">
+      if(vectorCount != container.size() || oldVector == null) {
+      <#else>
       if(vectorCount != container.size()) {
+      </#if>
         writer.allocate();
       }
       writer.setPosition(${index});
@@ -128,9 +135,16 @@ public class ${mode}ListWriter extends AbstractFieldWriter {
     case INIT:
       final int vectorCount = container.size();
       final RepeatedListVector vector = container.addOrGet(name, RepeatedListVector.TYPE, RepeatedListVector.class);
+      <#if mode == "Single">
+      final ValueVector oldVector = innerVector;
+      </#if>
       innerVector = vector;
       writer = new RepeatedListWriter(null, vector, this);
+      <#if mode == "Single">
+      if(vectorCount != container.size() || oldVector == null) {
+      <#else>
       if(vectorCount != container.size()) {
+      </#if>
         writer.allocate();
       }
       writer.setPosition(${index});
@@ -158,9 +172,16 @@ public class ${mode}ListWriter extends AbstractFieldWriter {
     case INIT:
       final int vectorCount = container.size();
       final Repeated${capName}Vector vector = container.addOrGet(name, ${upperName}_TYPE, Repeated${capName}Vector.class);
+      <#if mode == "Single">
+      final ValueVector oldVector = innerVector;
+      </#if>
       innerVector = vector;
       writer = new Repeated${capName}WriterImpl(vector, this);
+      <#if mode == "Single">
+      if(vectorCount != container.size() || oldVector == null) {
+      <#else>
       if(vectorCount != container.size()) {
+      </#if>
         writer.allocate();
       }
       writer.setPosition(${index});
@@ -219,7 +240,9 @@ public class ${mode}ListWriter extends AbstractFieldWriter {
   }
 
   public void endList() {
-    // noop
+    if (getValueCapacity() == 0) {
+      container.addOrGet(name, Types.repeated(MinorType.LATE), RepeatedZeroVector.class);
+    }
   }
   </#if>
 
