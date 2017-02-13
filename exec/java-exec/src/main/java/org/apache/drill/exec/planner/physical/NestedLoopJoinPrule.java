@@ -49,7 +49,7 @@ public class NestedLoopJoinPrule extends JoinPruleBase {
       PlannerSettings settings) {
     JoinRelType type = join.getJoinType();
 
-    if (! (type == JoinRelType.INNER || type == JoinRelType.LEFT)) {
+    if (type != JoinRelType.INNER) {
       return false;
     }
 

@@ -79,8 +79,14 @@ public class TestTpchDistributed extends BaseTestQuery {
     testDistributed("queries/tpch/10.sql");
   }
 
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
   @Test
-  public void tpch11() throws Exception{
+  @Ignore // DRILL-5263
+  public void tpch11() throws Exception {
     testDistributed("queries/tpch/11.sql");
   }
 

@@ -63,7 +63,7 @@ public class TestTpchDistributedConcurrent extends BaseTestQuery {
     "queries/tpch/08.sql",
     "queries/tpch/09.sql",
     "queries/tpch/10.sql",
-    "queries/tpch/11.sql",
+    // "queries/tpch/11.sql",  see DRILL-5263
     "queries/tpch/12.sql",
     "queries/tpch/13.sql",
     "queries/tpch/14.sql",

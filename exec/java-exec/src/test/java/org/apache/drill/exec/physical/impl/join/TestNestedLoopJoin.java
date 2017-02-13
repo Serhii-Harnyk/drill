@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,11 +19,13 @@
 package org.apache.drill.exec.physical.impl.join;
 
 import org.apache.drill.PlanTestBase;
-import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.common.exceptions.UserRemoteException;
 import org.apache.drill.common.util.TestTools;
-import org.apache.drill.exec.work.foreman.UnsupportedRelOperatorException;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.StringStartsWith.startsWith;
 
 public class TestNestedLoopJoin extends PlanTestBase {
 
@@ -78,7 +80,13 @@ public class TestNestedLoopJoin extends PlanTestBase {
     testPlanMatchingPatterns(testNlJoinNotIn_1, new String[]{nlpattern}, new String[]{});
   }
 
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
   @Test
+  @Ignore // DRILL-5263
   public void testNlJoinInequality_1() throws Exception {
     testPlanMatchingPatterns(testNlJoinInequality_1, new String[]{nlpattern}, new String[]{});
   }
@@ -106,7 +114,13 @@ public class TestNestedLoopJoin extends PlanTestBase {
     testPlanMatchingPatterns(query, new String[]{nlpattern}, new String[]{});
   }
 
-  @Test // equality join and scalar right input, hj and mj disabled
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
+  @Test   // equality join and scalar right input, hj and mj disabled
+  @Ignore // DRILL-5263
   public void testNlJoinEqualityScalar_1_planning() throws Exception {
     String query = "select r_regionkey from cp.`tpch/region.parquet` "
         + " where r_regionkey = (select min(n_regionkey) from cp.`tpch/nation.parquet` "
@@ -118,7 +132,13 @@ public class TestNestedLoopJoin extends PlanTestBase {
     test(ENABLE_MJ);
   }
 
-  @Test // equality join and scalar right input, hj and mj disabled, enforce exchanges
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
+  @Test   // equality join and scalar right input, hj and mj disabled, enforce exchanges
+  @Ignore // DRILL-5263
   public void testNlJoinEqualityScalar_2_planning() throws Exception {
     String query = "select r_regionkey from cp.`tpch/region.parquet` "
         + " where r_regionkey = (select min(n_regionkey) from cp.`tpch/nation.parquet` "
@@ -203,7 +223,13 @@ public class TestNestedLoopJoin extends PlanTestBase {
         .go();
   }
 
+  /**
+   * Calcite converts join with sub-query with exists into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
   @Test
+  @Ignore // DRILL-5263
   public void testNLJWithEmptyBatch() throws Exception {
     Long result = 0l;
 
@@ -252,5 +278,20 @@ public class TestNestedLoopJoin extends PlanTestBase {
     test(ENABLE_NLJ_SCALAR);
     test(ENABLE_HJ);
     test(ENABLE_MJ);
+  }
+
+  @Test(expected = UserRemoteException.class)
+  public void testExceptionLeftNlJoin() throws Exception {
+    try {
+      test(DISABLE_NLJ_SCALAR);
+      test("select r.r_regionkey, n.n_nationkey from cp.`tpch/nation.parquet` n " +
+            " left join cp.`tpch/region.parquet` r on n.n_regionkey < r.r_regionkey where n.n_nationkey < 3");
+    } catch (UserRemoteException e) {
+      assertThat("No expected current \"UNSUPPORTED_OPERATION ERROR\"",
+        e.getMessage(), startsWith("UNSUPPORTED_OPERATION ERROR"));
+      throw e;
+    } finally {
+      test("alter session reset `planner.enable_nljoin_for_scalar_only`");
+    }
   }
 }

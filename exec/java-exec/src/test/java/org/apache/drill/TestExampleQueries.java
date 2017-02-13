@@ -906,7 +906,13 @@ public class TestExampleQueries extends BaseTestQuery {
         .run();
   }
 
-  @Test  // DRILL-2966
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
+  @Test   // DRILL-2966
+  @Ignore // DRILL-5263
   public void testHavingAggFunction() throws Exception {
     String query1 = "select n_nationkey as col \n" +
         "from cp.`tpch/nation.parquet` \n" +
@@ -956,7 +962,13 @@ public class TestExampleQueries extends BaseTestQuery {
         .run();
   }
 
-  @Test  //DRILL-3018
+  /**
+   * Calcite converts join with scalar sub-query into left join.
+   * @see org.apache.calcite.sql2rel.SqlToRelConverter#substituteSubquery
+   * As Drill does not support left NLJoin, this test should be ignored.
+   */
+  @Test   // DRILL-3018
+  @Ignore // DRILL-5263
   public void testNestLoopJoinScalarSubQ() throws Exception {
     testBuilder()
         .sqlQuery("select n_nationkey from cp.`tpch/nation.parquet` where n_nationkey >= (select min(c_nationkey) from cp.`tpch/customer.parquet`)")
