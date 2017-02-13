@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.vector.complex.fn;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import io.netty.buffer.DrillBuf;
 
@@ -544,9 +545,12 @@ public class JsonReader extends BaseJsonProcessor {
    * @param fieldName
    */
   private void putFieldPath(String fieldName, MapWriter map) {
-    List<String> fieldPath = Lists.newArrayList(path);
-    fieldPath.add(fieldName);
-    fieldPathWriter.put(fieldPath, map);
+    path.add(fieldName);
+    if (!fieldPathWriter.containsKey(path)) {
+      List<String> fieldPath = ImmutableList.copyOf(path);
+      fieldPathWriter.put(fieldPath, map);
+    }
+    path.remove(path.size() - 1);
   }
   /**
    * Will attempt to take the current value and consume it as an extended value

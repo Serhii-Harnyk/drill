@@ -723,6 +723,7 @@ public class TestJsonReader extends BaseTestQuery {
       testNoResult("alter session reset `exec.enable_union_type`");
     }
   }
+
   @Test // DRILL-4842
   public void testSelectStarWithAllTextMode() throws Exception {
     File path = new File(BaseTestQuery.getTempDir("json/input"));
