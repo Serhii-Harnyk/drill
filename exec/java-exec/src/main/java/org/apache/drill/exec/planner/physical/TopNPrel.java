@@ -72,7 +72,7 @@ public class TopNPrel extends SinglePrel {
       return super.computeSelfCost(planner, mq).multiplyBy(0.05);
     }
     RelNode child = this.getInput();
-    double inputRows = child.estimateRowCount(mq);
+    double inputRows = mq.getRowCount(child);
     int numSortFields = this.collation.getFieldCollations().size();
     double cpuCost = DrillCostBase.COMPARE_CPU_COST * numSortFields * inputRows * (Math.log(limit)/Math.log(2));
     double diskIOCost = 0; // assume in-memory for now until we enforce operator-level memory constraints

@@ -70,7 +70,7 @@ public class StreamAggPrel extends AggPrelBase implements Prel{
       return super.computeSelfCost(planner, mq).multiplyBy(.1);
     }
     RelNode child = this.getInput();
-    double inputRows = child.estimateRowCount(mq);
+    double inputRows = mq.getRowCount(child);
 
     int numGroupByFields = this.getGroupCount();
     int numAggrFields = this.aggCalls.size();

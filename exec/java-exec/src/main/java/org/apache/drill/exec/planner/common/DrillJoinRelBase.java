@@ -126,8 +126,8 @@ public abstract class DrillJoinRelBase extends Join implements DrillRelNode {
   }
 
   protected  RelOptCost computeCartesianJoinCost(RelOptPlanner planner, RelMetadataQuery mq) {
-    final double probeRowCount = this.getLeft().estimateRowCount(mq);
-    final double buildRowCount = this.getRight().estimateRowCount(mq);
+    final double probeRowCount = mq.getRowCount(this.getLeft());
+    final double buildRowCount = mq.getRowCount(this.getRight());
 
     final DrillCostFactory costFactory = (DrillCostFactory) planner.getCostFactory();
 
@@ -170,8 +170,8 @@ public abstract class DrillJoinRelBase extends Join implements DrillRelNode {
    * @return         : RelOptCost
    */
   private RelOptCost computeHashJoinCostWithKeySize(RelOptPlanner planner, int keySize, RelMetadataQuery mq) {
-    double probeRowCount = this.getLeft().estimateRowCount(mq);
-    double buildRowCount = this.getRight().estimateRowCount(mq);
+    double probeRowCount = mq.getRowCount(this.getLeft());
+    double buildRowCount = mq.getRowCount(this.getRight());
 
     // cpu cost of hashing the join keys for the build side
     double cpuCostBuild = DrillCostBase.HASH_CPU_COST * keySize * buildRowCount;

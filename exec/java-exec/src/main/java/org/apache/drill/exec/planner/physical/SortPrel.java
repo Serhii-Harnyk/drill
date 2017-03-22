@@ -56,7 +56,7 @@ public class SortPrel extends org.apache.calcite.rel.core.Sort implements Prel {
     }
 
     RelNode child = this.getInput();
-    double inputRows = child.estimateRowCount(mq);
+    double inputRows = mq.getRowCount(child);
     // int  rowWidth = child.getRowType().getPrecision();
     int numSortFields = this.collation.getFieldCollations().size();
     double cpuCost = DrillCostBase.COMPARE_CPU_COST * numSortFields * inputRows * (Math.log(inputRows)/Math.log(2));

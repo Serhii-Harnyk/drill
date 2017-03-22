@@ -74,7 +74,7 @@ public abstract class JoinPruleBase extends Prule {
 
   protected boolean checkBroadcastConditions(RelOptPlanner planner, DrillJoinRel join, RelNode left, RelNode right) {
 
-    double estimatedRightRowCount = right.estimateRowCount(RelMetadataQuery.instance());
+    double estimatedRightRowCount = RelMetadataQuery.instance().getRowCount(right);
     if (estimatedRightRowCount < PrelUtil.getSettings(join.getCluster()).getBroadcastThreshold()
         && ! left.getTraitSet().getTrait(DrillDistributionTraitDef.INSTANCE).equals(DrillDistributionTrait.SINGLETON)
         && (join.getJoinType() == JoinRelType.INNER || join.getJoinType() == JoinRelType.LEFT)

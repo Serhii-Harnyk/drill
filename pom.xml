@@ -853,11 +853,6 @@
         <version>${janino.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.codehaus.janino</groupId>
-        <artifactId>commons-compiler-jdk</artifactId>
-        <version>${janino.version}</version>
-      </dependency>
-      <dependency>
         <groupId>com.mapr.db</groupId>
         <artifactId>maprdb</artifactId>
         <version>${mapr.release.version}</version>

@@ -68,8 +68,8 @@ public class MergeJoinPrel  extends JoinPrel {
     if (joincategory == JoinCategory.CARTESIAN || joincategory == JoinCategory.INEQUALITY) {
       return planner.getCostFactory().makeInfiniteCost();
     }
-    double leftRowCount = this.getLeft().estimateRowCount(mq);
-    double rightRowCount = this.getRight().estimateRowCount(mq);
+    double leftRowCount = mq.getRowCount(this.getLeft());
+    double rightRowCount = mq.getRowCount(this.getRight());
     // cost of evaluating each leftkey=rightkey join condition
     double joinConditionCost = DrillCostBase.COMPARE_CPU_COST * this.getLeftKeys().size();
     double cpuCost = joinConditionCost * (leftRowCount + rightRowCount);

@@ -44,7 +44,7 @@ public class OrderedPartitionExchangePrel extends ExchangePrel {
       return super.computeSelfCost(planner, mq).multiplyBy(.1);
     }
     RelNode child = this.getInput();
-    double inputRows = child.estimateRowCount(mq);
+    double inputRows = mq.getRowCount(child);
 
     int rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
 

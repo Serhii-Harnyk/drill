@@ -65,7 +65,7 @@ public class SingleMergeExchangePrel extends ExchangePrel {
       return super.computeSelfCost(planner, mq).multiplyBy(.1);
     }
     RelNode child = this.getInput();
-    double inputRows = child.estimateRowCount(mq);
+    double inputRows = mq.getRowCount(child);
     int  rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
     double svrCpuCost = DrillCostBase.SVR_CPU_COST * inputRows;
     double networkCost = DrillCostBase.BYTE_NETWORK_COST * inputRows * rowWidth;

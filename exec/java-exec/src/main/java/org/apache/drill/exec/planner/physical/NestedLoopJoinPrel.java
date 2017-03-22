@@ -67,8 +67,8 @@ public class NestedLoopJoinPrel  extends JoinPrel {
     if (PrelUtil.getSettings(getCluster()).useDefaultCosting()) {
       return super.computeSelfCost(planner, mq).multiplyBy(.1);
     }
-    double leftRowCount = this.getLeft().estimateRowCount(mq);
-    double rightRowCount = this.getRight().estimateRowCount(mq);
+    double leftRowCount = mq.getRowCount(this.getLeft());
+    double rightRowCount = mq.getRowCount(this.getRight());
     double nljFactor = PrelUtil.getSettings(getCluster()).getNestedLoopJoinFactor();
 
     // cpu cost of evaluating each leftkey=rightkey join condition

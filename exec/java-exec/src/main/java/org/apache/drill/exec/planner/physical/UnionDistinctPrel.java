@@ -61,7 +61,7 @@ public class UnionDistinctPrel extends UnionPrel {
     }
     double totalInputRowCount = 0;
     for (int i = 0; i < this.getInputs().size(); i++) {
-      totalInputRowCount += this.getInputs().get(i).estimateRowCount(mq);
+      totalInputRowCount += mq.getRowCount(this.getInputs().get(i));
     }
 
     double cpuCost = totalInputRowCount * DrillCostBase.BASE_CPU_COST;
